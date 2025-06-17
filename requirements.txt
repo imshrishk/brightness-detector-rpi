@@ -1,0 +1,8 @@
+numpy>=1.24.0
+pillow>=10.0.0
+picamera2>=0.3.12; platform_system == "Linux"
+opencv-python>=4.8.0
+PyQt5>=5.15.9
+matplotlib>=3.7.0
+pytest>=7.3.1
+ffmpeg-python>=0.2.0 
