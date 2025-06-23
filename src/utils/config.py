@@ -9,6 +9,7 @@ import platform
 
 DEFAULT_CONFIG = {
     "camera": {
+        "index": 0,
         "resolution": (1280, 720),
         "framerate": 30,
         "rotation": 0,

@@ -8,7 +8,8 @@ import threading
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLabel, QComboBox, QProgressBar, QGroupBox, 
-    QCheckBox, QSpinBox, QMessageBox, QFileDialog
+    QCheckBox, QSpinBox, QMessageBox, QFileDialog,
+    QFrame
 )
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor
@@ -48,50 +49,116 @@ class AnalysisTab(QWidget):
         """Initialize user interface"""
         # Main layout
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+        
+        # Media preview container
+        preview_container = QFrame()
+        preview_container.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        preview_container.setStyleSheet("""
+            QFrame {
+                background-color: #1a1a1a;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(10, 10, 10, 10)
         
         # Media preview
         self.media_preview = QLabel("No media loaded")
         self.media_preview.setAlignment(Qt.AlignCenter)
         self.media_preview.setMinimumSize(640, 480)
-        self.media_preview.setStyleSheet("background-color: #222; color: white;")
-        main_layout.addWidget(self.media_preview)
+        self.media_preview.setStyleSheet("""
+            QLabel {
+                background-color: #222;
+                color: #666;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+        """)
+        preview_layout.addWidget(self.media_preview)
+        main_layout.addWidget(preview_container)
         
         # Analysis settings
         settings_group = QGroupBox("Analysis Settings")
+        settings_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #dcdde1;
+                border-radius: 6px;
+                margin-top: 1em;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+                color: #2c3e50;
+            }
+        """)
         settings_layout = QVBoxLayout(settings_group)
+        settings_layout.setContentsMargins(15, 15, 15, 15)
+        settings_layout.setSpacing(15)
         
         # Analysis controls
         controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(20)
         
         # Analysis type selector
+        type_label = QLabel("Analysis Type:")
+        type_label.setStyleSheet("color: #2c3e50;")
         self.analyze_option = QComboBox()
         self.analyze_option.addItem("Analyze Frame", "frame")
         self.analyze_option.addItem("Analyze Video", "video")
-        controls_layout.addWidget(QLabel("Analysis Type:"))
+        controls_layout.addWidget(type_label)
         controls_layout.addWidget(self.analyze_option)
         
         # Sample rate for video analysis
+        rate_label = QLabel("Sample Rate:")
+        rate_label.setStyleSheet("color: #2c3e50;")
         self.sample_rate = QSpinBox()
         self.sample_rate.setMinimum(1)
         self.sample_rate.setMaximum(30)
         self.sample_rate.setValue(self.config["analysis"]["sample_rate"])
         self.sample_rate.setPrefix("Every ")
         self.sample_rate.setSuffix(" frames")
-        controls_layout.addWidget(QLabel("Sample Rate:"))
+        controls_layout.addWidget(rate_label)
         controls_layout.addWidget(self.sample_rate)
         
         # Highlight radius control
+        radius_label = QLabel("Highlight Radius:")
+        radius_label.setStyleSheet("color: #2c3e50;")
         self.highlight_radius = QSpinBox()
         self.highlight_radius.setMinimum(5)
         self.highlight_radius.setMaximum(50)
         self.highlight_radius.setValue(self.config["analysis"]["highlight_radius"])
         self.highlight_radius.setSuffix(" px")
-        controls_layout.addWidget(QLabel("Highlight Radius:"))
+        controls_layout.addWidget(radius_label)
         controls_layout.addWidget(self.highlight_radius)
         
         # Include Average Brightness option
         self.include_avg = QCheckBox("Include Average Brightness")
         self.include_avg.setChecked(True)
+        self.include_avg.setStyleSheet("""
+            QCheckBox {
+                color: #2c3e50;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 2px solid #dcdde1;
+                border-radius: 3px;
+                background-color: white;
+            }
+            QCheckBox::indicator:checked {
+                border: 2px solid #3498db;
+                border-radius: 3px;
+                background-color: #3498db;
+            }
+        """)
         controls_layout.addWidget(self.include_avg)
         
         # Add controls to settings layout
@@ -103,6 +170,18 @@ class AnalysisTab(QWidget):
         self.progress_bar.setMaximum(100)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #dcdde1;
+                border-radius: 4px;
+                text-align: center;
+                background-color: #f5f6fa;
+            }
+            QProgressBar::chunk {
+                background-color: #3498db;
+                border-radius: 3px;
+            }
+        """)
         settings_layout.addWidget(self.progress_bar)
         
         # Add settings group to main layout
@@ -110,20 +189,24 @@ class AnalysisTab(QWidget):
         
         # Buttons
         buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(15)
         
         # Load media button
         self.load_button = QPushButton("Load Media")
+        self.load_button.setMinimumWidth(120)
         self.load_button.clicked.connect(self.load_media_dialog)
         buttons_layout.addWidget(self.load_button)
         
         # Run analysis button
         self.analyze_button = QPushButton("Run Analysis")
+        self.analyze_button.setMinimumWidth(120)
         self.analyze_button.clicked.connect(self.run_analysis)
         self.analyze_button.setEnabled(False)
         buttons_layout.addWidget(self.analyze_button)
         
         # Clear button
         self.clear_button = QPushButton("Clear")
+        self.clear_button.setMinimumWidth(120)
         self.clear_button.clicked.connect(self.clear)
         buttons_layout.addWidget(self.clear_button)
         

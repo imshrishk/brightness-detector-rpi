@@ -16,7 +16,7 @@ class CVCamera:
         """Initialize the camera with configuration"""
         self.config = config
         self.camera = None
-        self.camera_index = 0
+        self.camera_index = config.get("index", 0)  # Use index from config
         self.resolution = config.get("resolution", (1280, 720))
         self.stream_active = False
         self.recording = False
@@ -104,11 +104,12 @@ class CVCamera:
         self.sim_frame_count += 1
         return frame
     
-    def select_camera(self, camera_index):
+    def select_camera(self, camera_index=None):
         """Select camera by index"""
         if self.camera is not None:
             self.release()
-        
+        if camera_index is None:
+            camera_index = self.config.get("index", 0)
         self.camera_index = camera_index
         
         # Enable simulation mode if the special index is selected

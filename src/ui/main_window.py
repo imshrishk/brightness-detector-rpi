@@ -7,7 +7,7 @@ import sys
 from PyQt5.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QFileDialog, QMessageBox, QSplitter,
-    QAction, QToolBar, QStatusBar, QComboBox
+    QAction, QToolBar, QStatusBar, QComboBox, QApplication
 )
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QTimer
 from PyQt5.QtGui import QIcon, QPixmap
@@ -16,6 +16,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 from ui.capture_tab import CaptureTab
 from ui.analysis_tab import AnalysisTab
 from ui.results_tab import ResultsTab
+from ui.styles import MAIN_STYLE
 from utils.config import update_config
 
 
@@ -30,12 +31,22 @@ class MainWindow(QMainWindow):
         
     def init_ui(self):
         """Initialize the user interface"""
+        # Set window properties
+        self.setWindowTitle("Brightness Detector")
+        self.setMinimumSize(1200, 800)
+        
+        # Apply stylesheet
+        self.setStyleSheet(MAIN_STYLE)
+        
         # Create central widget and layout
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
         
         # Create tab widget for different functions
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)  # Modern look for tabs
         
         # Create tabs
         self.capture_tab = CaptureTab(self.config)
@@ -67,6 +78,18 @@ class MainWindow(QMainWindow):
         
         # Create toolbar
         self.create_toolbar()
+        
+        # Center window on screen
+        self.center_window()
+    
+    def center_window(self):
+        """Center the window on the screen"""
+        screen = QApplication.primaryScreen().geometry()
+        size = self.geometry()
+        self.move(
+            (screen.width() - size.width()) // 2,
+            (screen.height() - size.height()) // 2
+        )
     
     def create_menu_bar(self):
         """Create the application menu bar"""
@@ -118,6 +141,7 @@ class MainWindow(QMainWindow):
         """Create the main toolbar"""
         toolbar = QToolBar("Main Toolbar")
         toolbar.setIconSize(QSize(24, 24))
+        toolbar.setMovable(False)
         self.addToolBar(toolbar)
         
         # Add toolbar buttons

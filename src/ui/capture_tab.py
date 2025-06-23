@@ -10,10 +10,11 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLabel, QComboBox, QSlider, QGroupBox, QGridLayout,
-    QCheckBox, QMessageBox, QFileDialog
+    QCheckBox, QMessageBox, QFileDialog, QFrame
 )
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer
 from PyQt5.QtGui import QImage, QPixmap
+from utils.config import update_config
 
 # Import camera module based on platform
 try:
@@ -48,20 +49,61 @@ class CaptureTab(QWidget):
         """Initialize user interface"""
         # Main layout
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+        
+        # Camera view container
+        camera_container = QFrame()
+        camera_container.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        camera_container.setStyleSheet("""
+            QFrame {
+                background-color: #1a1a1a;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        camera_layout = QVBoxLayout(camera_container)
+        camera_layout.setContentsMargins(10, 10, 10, 10)
         
         # Camera view
         self.camera_view = QLabel("Camera not available")
         self.camera_view.setAlignment(Qt.AlignCenter)
         self.camera_view.setMinimumSize(640, 480)
-        self.camera_view.setStyleSheet("background-color: #222; color: white;")
-        main_layout.addWidget(self.camera_view)
+        self.camera_view.setStyleSheet("""
+            QLabel {
+                background-color: #222;
+                color: #666;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+        """)
+        camera_layout.addWidget(self.camera_view)
+        main_layout.addWidget(camera_container)
         
         # Control panel
         control_panel = QGroupBox("Camera Controls")
+        control_panel.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #dcdde1;
+                border-radius: 6px;
+                margin-top: 1em;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+                color: #2c3e50;
+            }
+        """)
         control_layout = QGridLayout(control_panel)
+        control_layout.setContentsMargins(15, 15, 15, 15)
+        control_layout.setSpacing(15)
         
         # Camera selection
         camera_label = QLabel("Camera:")
+        camera_label.setStyleSheet("color: #2c3e50;")
         self.camera_selector = QComboBox()
         self.camera_selector.addItem("Default Camera", 0)
         self.camera_selector.currentIndexChanged.connect(self.change_camera)
@@ -70,6 +112,7 @@ class CaptureTab(QWidget):
         
         # Resolution selection
         resolution_label = QLabel("Resolution:")
+        resolution_label.setStyleSheet("color: #2c3e50;")
         self.resolution_selector = QComboBox()
         self.resolution_selector.addItem("640x480", (640, 480))
         self.resolution_selector.addItem("1280x720", (1280, 720))
@@ -80,21 +123,61 @@ class CaptureTab(QWidget):
         
         # Brightness control
         brightness_label = QLabel("Brightness:")
+        brightness_label.setStyleSheet("color: #2c3e50;")
         self.brightness_slider = QSlider(Qt.Horizontal)
         self.brightness_slider.setMinimum(0)
         self.brightness_slider.setMaximum(100)
         self.brightness_slider.setValue(self.config["camera"]["brightness"])
         self.brightness_slider.valueChanged.connect(self.change_brightness)
+        self.brightness_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #dcdde1;
+                height: 8px;
+                background: #f5f6fa;
+                margin: 2px 0;
+                border-radius: 4px;
+            }
+            QSlider::handle:horizontal {
+                background: #3498db;
+                border: none;
+                width: 18px;
+                margin: -5px 0;
+                border-radius: 9px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #2980b9;
+            }
+        """)
         control_layout.addWidget(brightness_label, 1, 0)
         control_layout.addWidget(self.brightness_slider, 1, 1)
         
         # Contrast control
         contrast_label = QLabel("Contrast:")
+        contrast_label.setStyleSheet("color: #2c3e50;")
         self.contrast_slider = QSlider(Qt.Horizontal)
         self.contrast_slider.setMinimum(-100)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(self.config["camera"]["contrast"])
         self.contrast_slider.valueChanged.connect(self.change_contrast)
+        self.contrast_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #dcdde1;
+                height: 8px;
+                background: #f5f6fa;
+                margin: 2px 0;
+                border-radius: 4px;
+            }
+            QSlider::handle:horizontal {
+                background: #3498db;
+                border: none;
+                width: 18px;
+                margin: -5px 0;
+                border-radius: 9px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #2980b9;
+            }
+        """)
         control_layout.addWidget(contrast_label, 1, 2)
         control_layout.addWidget(self.contrast_slider, 1, 3)
         
@@ -103,19 +186,23 @@ class CaptureTab(QWidget):
         
         # Buttons layout
         buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(15)
         
         # Start/Stop stream button
         self.stream_button = QPushButton("Start Stream")
+        self.stream_button.setMinimumWidth(120)
         self.stream_button.clicked.connect(self.toggle_stream)
         buttons_layout.addWidget(self.stream_button)
         
         # Capture button
         self.capture_button = QPushButton("Capture Image")
+        self.capture_button.setMinimumWidth(120)
         self.capture_button.clicked.connect(self.capture_image)
         buttons_layout.addWidget(self.capture_button)
         
         # Record button
         self.record_button = QPushButton("Start Recording")
+        self.record_button.setMinimumWidth(120)
         self.record_button.clicked.connect(self.toggle_recording)
         buttons_layout.addWidget(self.record_button)
         
@@ -130,6 +217,13 @@ class CaptureTab(QWidget):
         """Initialize the camera"""
         try:
             self.camera = Camera(self.config["camera"])
+            # Set the camera selector to the config index if available
+            index = self.config["camera"].get("index", 0)
+            if self.camera_selector.count() > 0:
+                for i in range(self.camera_selector.count()):
+                    if self.camera_selector.itemData(i) == index:
+                        self.camera_selector.setCurrentIndex(i)
+                        break
             
             # Try to get a list of available cameras
             cam_list = self.camera.list_cameras()
@@ -296,21 +390,20 @@ class CaptureTab(QWidget):
             # Stop any active stream/recording
             was_streaming = self.stream_active
             was_recording = self.recording
-            
             if self.stream_active:
                 self.toggle_stream()
-            
             if self.recording:
                 self.toggle_recording()
-            
             # Switch camera
             try:
-                self.camera.select_camera(self.camera_selector.currentData())
-                
+                selected_index = self.camera_selector.currentData()
+                self.camera.select_camera(selected_index)
+                # Update config with new camera index
+                self.config["camera"]["index"] = selected_index
+                update_config({"camera": {"index": selected_index}})
                 # Restore previous state
                 if was_streaming:
                     self.toggle_stream()
-                
                 if was_recording:
                     self.toggle_recording()
             except Exception as e:

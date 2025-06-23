@@ -8,7 +8,8 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLabel, QTableWidget, QTableWidgetItem, QGroupBox, 
-    QTextEdit, QFileDialog, QMessageBox, QSplitter
+    QTextEdit, QFileDialog, QMessageBox, QSplitter,
+    QFrame
 )
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor
@@ -35,34 +36,114 @@ class ResultsTab(QWidget):
         """Initialize user interface"""
         # Main layout
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
         
         # Create splitter for resizable sections
         splitter = QSplitter(Qt.Vertical)
+        splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #dcdde1;
+                height: 2px;
+            }
+            QSplitter::handle:hover {
+                background-color: #3498db;
+            }
+        """)
         
         # Image preview section
         image_group = QGroupBox("Image Preview")
+        image_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #dcdde1;
+                border-radius: 6px;
+                margin-top: 1em;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+                color: #2c3e50;
+            }
+        """)
         image_layout = QVBoxLayout(image_group)
+        image_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Image preview container
+        preview_container = QFrame()
+        preview_container.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        preview_container.setStyleSheet("""
+            QFrame {
+                background-color: #1a1a1a;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(10, 10, 10, 10)
         
         self.image_preview = QLabel("No results to display")
         self.image_preview.setAlignment(Qt.AlignCenter)
         self.image_preview.setMinimumSize(640, 360)
-        self.image_preview.setStyleSheet("background-color: #222; color: white;")
-        image_layout.addWidget(self.image_preview)
+        self.image_preview.setStyleSheet("""
+            QLabel {
+                background-color: #222;
+                color: #666;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+        """)
+        preview_layout.addWidget(self.image_preview)
+        image_layout.addWidget(preview_container)
         
         splitter.addWidget(image_group)
         
         # Details section
         details_group = QGroupBox("Analysis Details")
+        details_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #dcdde1;
+                border-radius: 6px;
+                margin-top: 1em;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 5px;
+                color: #2c3e50;
+            }
+        """)
         details_layout = QVBoxLayout(details_group)
+        details_layout.setContentsMargins(15, 15, 15, 15)
+        details_layout.setSpacing(15)
         
         # Create details panel with information
         self.details_text = QTextEdit()
         self.details_text.setReadOnly(True)
+        self.details_text.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #dcdde1;
+                border-radius: 4px;
+                padding: 8px;
+                background-color: white;
+            }
+        """)
         details_layout.addWidget(self.details_text)
         
         # Create visualization area (for brightness histogram, etc.)
-        self.figure = Figure()
+        self.figure = Figure(facecolor='white')
         self.canvas = FigureCanvas(self.figure)
+        self.canvas.setStyleSheet("""
+            FigureCanvas {
+                border: 1px solid #dcdde1;
+                border-radius: 4px;
+                background-color: white;
+            }
+        """)
         details_layout.addWidget(self.canvas)
         
         splitter.addWidget(details_group)
@@ -72,27 +153,32 @@ class ResultsTab(QWidget):
         
         # Buttons layout
         buttons_layout = QHBoxLayout()
+        buttons_layout.setSpacing(15)
         
         # Save image button
         self.save_image_button = QPushButton("Save Image")
+        self.save_image_button.setMinimumWidth(120)
         self.save_image_button.clicked.connect(self.save_image)
         self.save_image_button.setEnabled(False)
         buttons_layout.addWidget(self.save_image_button)
         
         # Save data button
         self.save_data_button = QPushButton("Save Analysis Data")
+        self.save_data_button.setMinimumWidth(120)
         self.save_data_button.clicked.connect(self.save_data)
         self.save_data_button.setEnabled(False)
         buttons_layout.addWidget(self.save_data_button)
         
         # Export button
         self.export_button = QPushButton("Export to Excel")
+        self.export_button.setMinimumWidth(120)
         self.export_button.clicked.connect(self.export_to_excel)
         self.export_button.setEnabled(False)
         buttons_layout.addWidget(self.export_button)
         
         # Clear button
         self.clear_button = QPushButton("Clear Results")
+        self.clear_button.setMinimumWidth(120)
         self.clear_button.clicked.connect(self.clear)
         buttons_layout.addWidget(self.clear_button)
         
