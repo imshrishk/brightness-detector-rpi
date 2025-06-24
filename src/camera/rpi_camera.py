@@ -32,8 +32,6 @@ class RPiCamera:
         self.recording = False
         self.encoder = None
         self.output = None
-        self.latest_frame = None
-        self.frame_lock = threading.Lock()
         
         # Try to initialize the camera
         self._init_camera()
@@ -112,17 +110,6 @@ class RPiCamera:
             print(f"Error selecting camera: {e}")
             return False
     
-    def _frame_callback(self, request):
-        """Callback for new frames"""
-        with self.frame_lock:
-            # Get the RGB image from the request
-            buffer = request.make_array("main")
-            self.latest_frame = buffer.copy()
-            
-            # Record the frame if recording
-            if self.recording and self.encoder is not None:
-                self.encoder.encode(request)
-    
     def start_stream(self):
         """Start camera stream"""
         if not self.camera:
@@ -134,10 +121,6 @@ class RPiCamera:
         try:
             # Start the camera
             self.camera.start()
-            
-            # Setup the callback
-            self.camera.set_image_callback(self._frame_callback)
-            
             self.stream_active = True
         except Exception as e:
             print(f"Error starting stream: {e}")
@@ -160,11 +143,13 @@ class RPiCamera:
         if not self.camera or not self.stream_active:
             return None
         
-        with self.frame_lock:
-            if self.latest_frame is not None:
-                return self.latest_frame.copy()
-        
-        return None
+        try:
+            # capture_array is a blocking call, which is what we want
+            # for the QTimer-based update mechanism.
+            return self.camera.capture_array("main")
+        except Exception as e:
+            print(f"Error capturing frame: {e}")
+            return None
     
     def capture_image(self):
         """Capture a still image"""
@@ -175,22 +160,8 @@ class RPiCamera:
             raise Exception("Camera is not available")
         
         try:
-            # If streaming, use the latest frame
-            if self.stream_active and self.latest_frame is not None:
-                with self.frame_lock:
-                    return self.latest_frame.copy()
-            
-            # Otherwise take a photo
-            if not self.stream_active:
-                self.camera.start()
-            
-            # Capture an image
-            metadata = self.camera.capture_array("main")
-            
-            if not self.stream_active:
-                self.camera.stop()
-            
-            return metadata
+            # Capture a new array directly. This ensures we get a fresh frame.
+            return self.camera.capture_array("main")
         except Exception as e:
             print(f"Error capturing image: {e}")
             return None

@@ -228,20 +228,30 @@ class CaptureTab(QWidget):
         """Initialize the camera"""
         try:
             self.camera = Camera(self.config["camera"])
-            # Set the camera selector to the config index if available
-            index = self.config["camera"].get("index", 0)
-            if self.camera_selector.count() > 0:
-                for i in range(self.camera_selector.count()):
-                    if self.camera_selector.itemData(i) == index:
-                        self.camera_selector.setCurrentIndex(i)
-                        break
+
+            # Block signals from the camera selector while we modify it
+            self.camera_selector.blockSignals(True)
             
-            # Try to get a list of available cameras
+            # Get the list of available cameras and populate the dropdown
             cam_list = self.camera.list_cameras()
+            self.camera_selector.clear()
             if cam_list:
-                self.camera_selector.clear()
                 for i, cam_name in enumerate(cam_list):
                     self.camera_selector.addItem(cam_name, i)
+            
+            # Set the camera selector to the index from the config
+            saved_index = self.config["camera"].get("index", 0)
+            for i in range(self.camera_selector.count()):
+                if self.camera_selector.itemData(i) == saved_index:
+                    self.camera_selector.setCurrentIndex(i)
+                    break
+            
+            # Re-enable signals
+            self.camera_selector.blockSignals(False)
+
+            # Manually select the initial camera
+            self.camera.select_camera(self.camera_selector.currentData())
+
         except Exception as e:
             QMessageBox.warning(self, "Camera Error", f"Error initializing camera: {e}")
             print(f"Camera initialization error: {e}")
