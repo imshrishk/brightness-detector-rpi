@@ -388,7 +388,7 @@ class AnalysisTab(QWidget):
                 self.current_image = cv2.imread(file_path)
                 if self.current_image is not None:
                     # Convert BGR to RGB for display
-                    self.current_image = cv2.cvtColor(self.current_image, cv2.COLOR_RGB2RGB)
+                    self.current_image = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGB)
                     self.update_preview(self.current_image)
                     
                     print(f"Loaded image: {file_path}")
