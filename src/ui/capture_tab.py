@@ -16,13 +16,24 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 from utils.config import update_config
 
+def is_raspberry_pi():
+    """Checks if the code is running on a Raspberry Pi."""
+    try:
+        with open('/sys/firmware/devicetree/base/model', 'r') as f:
+            if 'raspberry pi' in f.read().lower():
+                return True
+    except Exception:
+        pass
+    return False
+
 # Import camera module based on platform
 try:
-    is_rpi = os.environ.get('IS_RPI', 'False').lower() == 'true'
-    if is_rpi:
+    if is_raspberry_pi():
+        print("INFO: Raspberry Pi detected. Using picamera2 backend.")
         # Import Raspberry Pi specific camera module
         from camera.rpi_camera import RPiCamera as Camera
     else:
+        print("INFO: Not a Raspberry Pi. Using OpenCV backend.")
         # Use OpenCV for other platforms
         from camera.cv_camera import CVCamera as Camera
 except ImportError as e:
