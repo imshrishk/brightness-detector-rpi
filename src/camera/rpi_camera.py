@@ -25,7 +25,8 @@ class RPiCamera:
     
     def __init__(self, config):
         """Initialize the camera with configuration"""
-        self.config = config        self.camera = None
+        self.config = config
+        self.camera = None
         self.resolution = config.get("resolution", (1280, 720))
         self.stream_active = False
         self.recording = False
