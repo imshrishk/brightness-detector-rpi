@@ -12,8 +12,8 @@ from datetime import datetime
 try:
     # Import picamera2 for Raspberry Pi
     from picamera2 import Picamera2
-    from picamera2.encoders import H264Encoder, MJPEGEncoder, Quality
-    from picamera2.outputs import FileOutput
+    from picamera2.encoders import H264Encoder, MJPEGEncoder
+    from picamera2.outputs import FfmpegOutput
     PICAMERA_AVAILABLE = True
 except ImportError:
     PICAMERA_AVAILABLE = False
@@ -30,8 +30,6 @@ class RPiCamera:
         self.resolution = config.get("resolution", (1280, 720))
         self.stream_active = False
         self.recording = False
-        self.encoder = None
-        self.output = None
         
         # Try to initialize the camera
         self._init_camera()
@@ -193,21 +191,16 @@ class RPiCamera:
             _, ext = os.path.splitext(file_path)
             
             if ext.lower() == '.mp4' or ext.lower() == '.h264':
-                # H.264 video
-                self.encoder = H264Encoder(Quality.HIGH)
+                encoder = H264Encoder(10000000)  # 10Mbps bitrate
             else:
-                # Default to MJPEG
-                self.encoder = MJPEGEncoder()
+                # Default to MJPEG for other formats like .avi
+                encoder = MJPEGEncoder()
             
-            # Create file output
-            self.output = FileOutput(file_path)
+            # Use FfmpegOutput for robust container handling
+            output = FfmpegOutput(file_path)
             
-            # Start recording
-            if not self.stream_active:
-                self.start_stream()
-            
-            self.encoder.output = self.output
-            self.camera.start_encoder(self.encoder)
+            # start_recording is a robust, high-level call
+            self.camera.start_recording(encoder, output)
             
             self.recording = True
             return True
@@ -222,17 +215,9 @@ class RPiCamera:
             return False
         
         try:
-            # Stop the encoder
-            self.camera.stop_encoder()
-            
-            # Close the output
-            if self.output:
-                self.output.close()
-            
+            # High-level call to stop recording
+            self.camera.stop_recording()
             self.recording = False
-            self.encoder = None
-            self.output = None
-            
             return True
         except Exception as e:
             print(f"Error stopping recording: {e}")
