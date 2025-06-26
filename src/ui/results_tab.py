@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLabel, QTableWidget, QTableWidgetItem, QGroupBox, 
     QTextEdit, QFileDialog, QMessageBox, QSplitter,
-    QFrame
+    QFrame, QSlider, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
 )
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor
@@ -21,6 +21,65 @@ from matplotlib.figure import Figure
 import pandas as pd
 
 
+class PhotoViewer(QGraphicsView):
+    """A QGraphicsView for displaying and interacting with images."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.scene = QGraphicsScene(self)
+        self.setScene(self.scene)
+        self.photo_item = QGraphicsPixmapItem()
+        self.scene.addItem(self.photo_item)
+        
+        # Placeholder text
+        self.placeholder = self.scene.addSimpleText("No results to display")
+        self.placeholder.setBrush(Qt.lightGray)
+        self.placeholder.setPos(0, 0)
+        
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setDragMode(QGraphicsView.NoDrag)
+        self.setMinimumSize(640, 360)
+        self._zoom = 0
+
+    def set_photo(self, pixmap=None):
+        if pixmap and not pixmap.isNull():
+            self.placeholder.setVisible(False)
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            self.photo_item.setPixmap(pixmap)
+            self.setSceneRect(self.photo_item.boundingRect())
+            self.fitInView(self.photo_item, Qt.KeepAspectRatio)
+            self._zoom = 0
+        else:
+            self.placeholder.setVisible(True)
+            self.setDragMode(QGraphicsView.NoDrag)
+            self.photo_item.setPixmap(QPixmap())
+            self.setSceneRect(self.placeholder.boundingRect())
+
+    def wheelEvent(self, event):
+        if not self.photo_item.pixmap().isNull():
+            if event.angleDelta().y() > 0:
+                factor = 1.25
+                self._zoom += 1
+            else:
+                factor = 0.8
+                self._zoom -= 1
+            
+            if self._zoom > 0:
+                self.scale(factor, factor)
+            elif self._zoom == 0:
+                self.fitInView(self.photo_item, Qt.KeepAspectRatio)
+            else:
+                self._zoom = 0
+
+    def resizeEvent(self, event):
+        if self._zoom == 0 and not self.photo_item.pixmap().isNull():
+            self.fitInView(self.photo_item, Qt.KeepAspectRatio)
+        super().resizeEvent(event)
+
+
 class ResultsTab(QWidget):
     """Results tab UI"""
     
@@ -28,6 +87,7 @@ class ResultsTab(QWidget):
         super().__init__()
         self.config = config
         self.current_image = None
+        self.adjusted_image = None
         self.current_analysis = None
         self.analysis_data = None
         self.init_ui()
@@ -39,150 +99,84 @@ class ResultsTab(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         
-        # Create splitter for resizable sections
+        # Splitter for resizable sections
         splitter = QSplitter(Qt.Vertical)
-        splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #dcdde1;
-                height: 2px;
-            }
-            QSplitter::handle:hover {
-                background-color: #3498db;
-            }
-        """)
         
-        # Image preview section
+        # --- Image Preview Section ---
         image_group = QGroupBox("Image Preview")
-        image_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #dcdde1;
-                border-radius: 6px;
-                margin-top: 1em;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top center;
-                padding: 0 5px;
-                color: #2c3e50;
-            }
-        """)
         image_layout = QVBoxLayout(image_group)
-        image_layout.setContentsMargins(15, 15, 15, 15)
         
-        # Image preview container
-        preview_container = QFrame()
-        preview_container.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
-        preview_container.setStyleSheet("""
-            QFrame {
-                background-color: #1a1a1a;
-                border-radius: 8px;
-                padding: 10px;
-            }
-        """)
-        preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setContentsMargins(10, 10, 10, 10)
+        self.image_preview = PhotoViewer()
+        image_layout.addWidget(self.image_preview)
         
-        self.image_preview = QLabel("No results to display")
-        self.image_preview.setAlignment(Qt.AlignCenter)
-        self.image_preview.setMinimumSize(640, 360)
-        self.image_preview.setStyleSheet("""
-            QLabel {
-                background-color: #222;
-                color: #666;
-                border-radius: 4px;
-                font-size: 14px;
-            }
-        """)
-        preview_layout.addWidget(self.image_preview)
-        image_layout.addWidget(preview_container)
+        # Brightness and Contrast controls
+        adj_layout = QHBoxLayout()
+        
+        # Brightness
+        bright_label = QLabel("Brightness:")
+        self.brightness_slider = QSlider(Qt.Horizontal)
+        self.brightness_slider.setRange(-100, 100)
+        self.brightness_slider.setValue(0)
+        self.brightness_slider.valueChanged.connect(self.apply_brightness_contrast)
+        self.brightness_slider.setEnabled(False)
+        adj_layout.addWidget(bright_label)
+        adj_layout.addWidget(self.brightness_slider)
+
+        # Contrast
+        contrast_label = QLabel("Contrast:")
+        self.contrast_slider = QSlider(Qt.Horizontal)
+        self.contrast_slider.setRange(-100, 100)
+        self.contrast_slider.setValue(0)
+        self.contrast_slider.valueChanged.connect(self.apply_brightness_contrast)
+        self.contrast_slider.setEnabled(False)
+        adj_layout.addWidget(contrast_label)
+        adj_layout.addWidget(self.contrast_slider)
+
+        image_layout.addLayout(adj_layout)
         
         splitter.addWidget(image_group)
         
-        # Details section
+        # --- Details Section ---
         details_group = QGroupBox("Analysis Details")
-        details_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #dcdde1;
-                border-radius: 6px;
-                margin-top: 1em;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top center;
-                padding: 0 5px;
-                color: #2c3e50;
-            }
-        """)
-        details_layout = QVBoxLayout(details_group)
-        details_layout.setContentsMargins(15, 15, 15, 15)
+        details_layout = QHBoxLayout(details_group)
         details_layout.setSpacing(15)
-        
-        # Create details panel with information
+
+        # Details Text
         self.details_text = QTextEdit()
         self.details_text.setReadOnly(True)
-        self.details_text.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #dcdde1;
-                border-radius: 4px;
-                padding: 8px;
-                background-color: white;
-            }
-        """)
-        details_layout.addWidget(self.details_text)
-        
-        # Create visualization area (for brightness histogram, etc.)
-        self.figure = Figure(facecolor='white')
+        details_layout.addWidget(self.details_text, 1) # Give more space to text
+
+        # Visualization
+        self.figure = Figure(facecolor='#2c3e50')
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setStyleSheet("""
-            FigureCanvas {
-                border: 1px solid #dcdde1;
-                border-radius: 4px;
-                background-color: white;
-            }
-        """)
-        details_layout.addWidget(self.canvas)
-        
+        details_layout.addWidget(self.canvas, 2) # And to the plot
+
         splitter.addWidget(details_group)
-        
-        # Add splitter to main layout
         main_layout.addWidget(splitter)
         
-        # Buttons layout
+        # --- Buttons ---
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(15)
         
-        # Save image button
         self.save_image_button = QPushButton("Save Image")
-        self.save_image_button.setMinimumWidth(120)
         self.save_image_button.clicked.connect(self.save_image)
         self.save_image_button.setEnabled(False)
         buttons_layout.addWidget(self.save_image_button)
         
-        # Save data button
         self.save_data_button = QPushButton("Save Analysis Data")
-        self.save_data_button.setMinimumWidth(120)
         self.save_data_button.clicked.connect(self.save_data)
         self.save_data_button.setEnabled(False)
         buttons_layout.addWidget(self.save_data_button)
         
-        # Export button
         self.export_button = QPushButton("Export to Excel")
-        self.export_button.setMinimumWidth(120)
         self.export_button.clicked.connect(self.export_to_excel)
         self.export_button.setEnabled(False)
         buttons_layout.addWidget(self.export_button)
         
-        # Clear button
         self.clear_button = QPushButton("Clear Results")
-        self.clear_button.setMinimumWidth(120)
         self.clear_button.clicked.connect(self.clear)
         buttons_layout.addWidget(self.clear_button)
         
-        # Add buttons layout to main layout
         main_layout.addLayout(buttons_layout)
     
     @pyqtSlot(object)
@@ -206,11 +200,7 @@ class ResultsTab(QWidget):
             q_image = QImage(image.data, width, height, width, QImage.Format_Grayscale8)
         
         # Display the QImage in the QLabel
-        self.image_preview.setPixmap(QPixmap.fromImage(q_image).scaled(
-            self.image_preview.width(),
-            self.image_preview.height(),
-            Qt.KeepAspectRatio
-        ))
+        self.image_preview.set_photo(QPixmap.fromImage(q_image))
         
         # Enable save buttons
         self.save_image_button.setEnabled(True)
@@ -231,7 +221,8 @@ class ResultsTab(QWidget):
             marked_frame = analysis_data['brightest_frame']
         
         # Display the image
-        self.display_image(marked_frame)
+        self.current_image = marked_frame.copy()
+        self.update_image_preview(self.current_image)
         
         # Update details text
         self.update_details_text(analysis_data)
@@ -242,110 +233,102 @@ class ResultsTab(QWidget):
         # Enable save buttons
         self.save_image_button.setEnabled(True)
         self.save_data_button.setEnabled(True)
+
+        # Reset and enable sliders
+        self.brightness_slider.setEnabled(True)
+        self.brightness_slider.setValue(0)
+        self.contrast_slider.setEnabled(True)
+        self.contrast_slider.setValue(0)
     
     def update_details_text(self, analysis_data):
         """Update the details text with analysis information"""
         self.analysis_data = analysis_data  # Store the data for export
         self.export_button.setEnabled(True)  # Enable export button
         
-        # Extract data from the analysis results
-        max_brightness = analysis_data.get('max_brightness', 0)
-        brightest_point = analysis_data.get('brightest_point', (0, 0))
-        average_brightness = analysis_data.get('average_brightness', 0)
-        frame_number = analysis_data.get('frame_number', 0)
-        
-        # Format the details text
         details = f"""
-        <h3>Brightness Analysis Results</h3>
-        <p><b>Maximum Brightness:</b> {max_brightness:.2f}</p>
-        <p><b>Brightest Point:</b> x={brightest_point[0]}, y={brightest_point[1]}</p>
-        <p><b>Average Brightness (surrounding area):</b> {average_brightness:.2f}</p>
+        <b>Analysis Results</b>
+        <hr>
+        <b>Timestamp:</b> {analysis_data.get('timestamp', 'N/A')}
+        <br>
+        <b>Media Path:</b> {analysis_data.get('media_path', 'N/A')}
+        <br>
+        <br>
+        <b>Brightest Point (X, Y):</b> {analysis_data.get('brightest_point', 'N/A')}
+        <br>
+        <b>Max Brightness (0-255):</b> {analysis_data.get('max_brightness', 'N/A'):.2f}
+        <br>
+        <b>Average Brightness:</b> {analysis_data.get('average_brightness', 'N/A'):.2f}
         """
         
-        if 'is_video' in analysis_data and analysis_data['is_video']:
-            details += f"<p><b>Frame Number:</b> {frame_number}</p>"
+        if 'frame_number' in analysis_data:
+            details += f"<br><b>Frame Number:</b> {analysis_data.get('frame_number', 'N/A')}"
             
-            if 'total_frames' in analysis_data:
-                details += f"<p><b>Total Frames:</b> {analysis_data['total_frames']}</p>"
-                details += f"<p><b>Frame Time:</b> {frame_number / analysis_data['fps']:.2f} seconds</p>"
-        
-        # Add metadata if available
-        if 'metadata' in analysis_data:
-            details += "<h3>Metadata</h3>"
-            for key, value in analysis_data['metadata'].items():
-                details += f"<p><b>{key}:</b> {value}</p>"
-        
-        # Set the details text
         self.details_text.setHtml(details)
     
     def update_visualization(self, analysis_data):
-        """Update the visualization with brightness data"""
-        # Clear previous plots
+        """Update the visualization with brightness histogram"""
         self.figure.clear()
         
-        # Create brightness histogram if data is available
-        if 'brightness_histogram' in analysis_data:
-            # Plot histogram from data
+        if 'histogram' in analysis_data and analysis_data['histogram'] is not None:
+            hist = analysis_data['histogram']
+            
             ax = self.figure.add_subplot(111)
-            ax.bar(
-                range(len(analysis_data['brightness_histogram'])),
-                analysis_data['brightness_histogram'],
-                color='blue',
-                alpha=0.7
-            )
-            ax.set_title('Brightness Distribution')
-            ax.set_xlabel('Brightness Level')
-            ax.set_ylabel('Pixel Count')
-            ax.grid(True, alpha=0.3)
-        else:
-            # Calculate histogram from the brightest frame
-            if 'brightest_frame' in analysis_data:
-                frame = analysis_data['brightest_frame']
-                
-                # Convert to grayscale if RGB
-                if len(frame.shape) == 3:
-                    # Use weighted brightness conversion
-                    r, g, b = cv2.split(frame)
-                    gray = cv2.addWeighted(
-                        cv2.addWeighted(r, 0.299, g, 0.587, 0), 
-                        1.0, 
-                        b, 
-                        0.114, 
-                        0
-                    )
-                else:
-                    gray = frame
-                
-                # Calculate histogram
-                hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
-                hist = [h[0] for h in hist]  # Convert to list
-                
-                # Plot histogram
-                ax = self.figure.add_subplot(111)
-                ax.bar(range(256), hist, color='blue', alpha=0.7, width=1)
-                ax.set_title('Brightness Distribution')
-                ax.set_xlabel('Brightness Level')
-                ax.set_ylabel('Pixel Count')
-                ax.grid(True, alpha=0.3)
-                
-                # Highlight the max brightness value
-                max_brightness = int(analysis_data.get('max_brightness', 0))
-                if 0 <= max_brightness < 256:
-                    ax.axvline(x=max_brightness, color='red', linestyle='--', linewidth=1)
-                    ax.text(
-                        max_brightness + 5, 
-                        max(hist) * 0.9, 
-                        f'Max: {max_brightness}', 
-                        color='red'
-                    )
-        
-        # Refresh the canvas
-        self.canvas.draw()
+            ax.plot(hist, color='#3498db')
+            ax.set_title("Brightness Histogram", color='white')
+            ax.set_xlabel("Brightness Level", color='white')
+            ax.set_ylabel("Pixel Count", color='white')
+            ax.grid(True, linestyle='--', alpha=0.6)
+            ax.set_facecolor('#34495e')
+
+            # Change tick colors
+            ax.tick_params(axis='x', colors='white')
+            ax.tick_params(axis='y', colors='white')
+
+            # Change spine colors
+            for spine in ax.spines.values():
+                spine.set_edgecolor('white')
+
+            self.canvas.draw()
     
+    def apply_brightness_contrast(self):
+        """Apply brightness and contrast to the current image."""
+        if self.current_image is None:
+            return
+
+        brightness = self.brightness_slider.value()
+        contrast = self.contrast_slider.value()
+
+        # Contrast is a multiplier (alpha), brightness is an offset (beta)
+        # Convert slider range to appropriate alpha and beta values
+        alpha = 1.0 + (contrast / 100.0)
+        beta = brightness
+
+        # Apply the transformation
+        self.adjusted_image = cv2.convertScaleAbs(self.current_image, alpha=alpha, beta=beta)
+        
+        # Update the preview with the adjusted image
+        self.update_image_preview(self.adjusted_image)
+
+    def update_image_preview(self, image_to_display):
+        """Helper to update the image preview label."""
+        if image_to_display is None:
+            self.image_preview.set_photo(None)
+            return
+
+        if len(image_to_display.shape) == 3 and image_to_display.shape[2] == 3:
+            h, w, ch = image_to_display.shape
+            q_img = QImage(image_to_display.data, w, h, ch * w, QImage.Format_RGB888)
+        else:
+            h, w = image_to_display.shape
+            q_img = QImage(image_to_display.data, w, h, w, QImage.Format_Grayscale8)
+        
+        self.image_preview.set_photo(QPixmap.fromImage(q_img))
+
     @pyqtSlot()
     def save_image(self):
         """Save the current image to a file"""
-        if self.current_image is None:
+        image_to_save = self.adjusted_image if self.adjusted_image is not None else self.current_image
+        if image_to_save is None:
             QMessageBox.warning(self, "Save Error", "No image to save")
             return
         
@@ -364,12 +347,12 @@ class ResultsTab(QWidget):
         if file_path:
             try:
                 # Save the image
-                if len(self.current_image.shape) == 3:
+                if len(image_to_save.shape) == 3:
                     # RGB image
-                    cv2.imwrite(file_path, cv2.cvtColor(self.current_image, cv2.COLOR_RGB2BGR))
+                    cv2.imwrite(file_path, cv2.cvtColor(image_to_save, cv2.COLOR_RGB2BGR))
                 else:
                     # Grayscale image
-                    cv2.imwrite(file_path, self.current_image)
+                    cv2.imwrite(file_path, image_to_save)
                 
                 QMessageBox.information(self, "Save Complete", f"Image saved to:\n{file_path}")
             except Exception as e:
@@ -432,21 +415,25 @@ class ResultsTab(QWidget):
     
     @pyqtSlot()
     def clear(self):
-        """Clear the results tab"""
+        """Clear the current results"""
         self.current_image = None
+        self.adjusted_image = None
         self.current_analysis = None
-        
-        # Clear UI elements
-        self.image_preview.setText("No results to display")
-        self.image_preview.setPixmap(QPixmap())
+        self.image_preview.set_photo(None)
         self.details_text.clear()
         self.figure.clear()
         self.canvas.draw()
         
-        # Disable save buttons
+        # Disable buttons
         self.save_image_button.setEnabled(False)
         self.save_data_button.setEnabled(False)
         self.export_button.setEnabled(False)
+
+        # Disable and reset sliders
+        self.brightness_slider.setEnabled(False)
+        self.brightness_slider.setValue(0)
+        self.contrast_slider.setEnabled(False)
+        self.contrast_slider.setValue(0)
     
     def export_to_excel(self):
         """Export analysis data to Excel"""
@@ -505,10 +492,10 @@ class ResultsTab(QWidget):
                 df.to_excel(file_path, index=False, sheet_name='Brightness Analysis')
                 
                 # Add histogram data to a new sheet
-                if 'brightness_histogram' in self.analysis_data:
+                if 'histogram' in self.analysis_data and self.analysis_data['histogram'] is not None:
                     hist_df = pd.DataFrame({
                         'Brightness Level': range(256),
-                        'Pixel Count': self.analysis_data['brightness_histogram']
+                        'Pixel Count': self.analysis_data['histogram']
                     })
                     
                     with pd.ExcelWriter(file_path, engine='openpyxl', mode='a') as writer:

@@ -16,6 +16,9 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 from utils.config import update_config
 
+# Determine if running in simulation mode
+IS_SIM_MODE = os.environ.get("SIMULATION_MODE", "False").lower() == "true"
+
 def is_raspberry_pi():
     """Checks if the code is running on a Raspberry Pi."""
     try:
@@ -28,7 +31,10 @@ def is_raspberry_pi():
 
 # Import camera module based on platform
 try:
-    if is_raspberry_pi():
+    if IS_SIM_MODE:
+        print("INFO: Simulation mode enabled. Using simulated camera.")
+        from camera.sim_camera import SimCamera as Camera
+    elif is_raspberry_pi():
         print("INFO: Raspberry Pi detected. Using picamera2 backend.")
         # Import Raspberry Pi specific camera module
         from camera.rpi_camera import RPiCamera as Camera
@@ -63,164 +69,72 @@ class CaptureTab(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(20)
         
-        # Camera view container
+        # --- Camera View ---
         camera_container = QFrame()
-        camera_container.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
-        camera_container.setStyleSheet("""
-            QFrame {
-                background-color: #1a1a1a;
-                border-radius: 8px;
-                padding: 10px;
-            }
-        """)
+        camera_container.setFrameShape(QFrame.StyledPanel)
         camera_layout = QVBoxLayout(camera_container)
-        camera_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Camera view
         self.camera_view = QLabel("Camera not available")
         self.camera_view.setAlignment(Qt.AlignCenter)
         self.camera_view.setMinimumSize(640, 480)
-        self.camera_view.setStyleSheet("""
-            QLabel {
-                background-color: #222;
-                color: #666;
-                border-radius: 4px;
-                font-size: 14px;
-            }
-        """)
         camera_layout.addWidget(self.camera_view)
         main_layout.addWidget(camera_container)
         
-        # Control panel
+        # --- Control Panel ---
         control_panel = QGroupBox("Camera Controls")
-        control_panel.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #dcdde1;
-                border-radius: 6px;
-                margin-top: 1em;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top center;
-                padding: 0 5px;
-                color: #2c3e50;
-            }
-        """)
         control_layout = QGridLayout(control_panel)
-        control_layout.setContentsMargins(15, 15, 15, 15)
         control_layout.setSpacing(15)
         
         # Camera selection
-        camera_label = QLabel("Camera:")
-        camera_label.setStyleSheet("color: #2c3e50;")
         self.camera_selector = QComboBox()
-        self.camera_selector.addItem("Default Camera", 0)
         self.camera_selector.currentIndexChanged.connect(self.change_camera)
-        control_layout.addWidget(camera_label, 0, 0)
+        control_layout.addWidget(QLabel("Camera:"), 0, 0)
         control_layout.addWidget(self.camera_selector, 0, 1)
         
         # Resolution selection
-        resolution_label = QLabel("Resolution:")
-        resolution_label.setStyleSheet("color: #2c3e50;")
         self.resolution_selector = QComboBox()
-        self.resolution_selector.addItem("640x480", (640, 480))
-        self.resolution_selector.addItem("1280x720", (1280, 720))
-        self.resolution_selector.addItem("1920x1080", (1920, 1080))
+        self.resolution_selector.addItems(["640x480", "1280x720", "1920x1080"])
         self.resolution_selector.currentIndexChanged.connect(self.change_resolution)
-        control_layout.addWidget(resolution_label, 0, 2)
+        control_layout.addWidget(QLabel("Resolution:"), 0, 2)
         control_layout.addWidget(self.resolution_selector, 0, 3)
         
         # Brightness control
-        brightness_label = QLabel("Brightness:")
-        brightness_label.setStyleSheet("color: #2c3e50;")
         self.brightness_slider = QSlider(Qt.Horizontal)
-        self.brightness_slider.setMinimum(0)
-        self.brightness_slider.setMaximum(100)
+        self.brightness_slider.setRange(0, 100)
         self.brightness_slider.setValue(self.config["camera"]["brightness"])
         self.brightness_slider.valueChanged.connect(self.change_brightness)
-        self.brightness_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #dcdde1;
-                height: 8px;
-                background: #f5f6fa;
-                margin: 2px 0;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #3498db;
-                border: none;
-                width: 18px;
-                margin: -5px 0;
-                border-radius: 9px;
-            }
-            QSlider::handle:horizontal:hover {
-                background: #2980b9;
-            }
-        """)
-        control_layout.addWidget(brightness_label, 1, 0)
+        control_layout.addWidget(QLabel("Brightness:"), 1, 0)
         control_layout.addWidget(self.brightness_slider, 1, 1)
         
         # Contrast control
-        contrast_label = QLabel("Contrast:")
-        contrast_label.setStyleSheet("color: #2c3e50;")
         self.contrast_slider = QSlider(Qt.Horizontal)
-        self.contrast_slider.setMinimum(-100)
-        self.contrast_slider.setMaximum(100)
+        self.contrast_slider.setRange(-100, 100)
         self.contrast_slider.setValue(self.config["camera"]["contrast"])
         self.contrast_slider.valueChanged.connect(self.change_contrast)
-        self.contrast_slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #dcdde1;
-                height: 8px;
-                background: #f5f6fa;
-                margin: 2px 0;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #3498db;
-                border: none;
-                width: 18px;
-                margin: -5px 0;
-                border-radius: 9px;
-            }
-            QSlider::handle:horizontal:hover {
-                background: #2980b9;
-            }
-        """)
-        control_layout.addWidget(contrast_label, 1, 2)
+        control_layout.addWidget(QLabel("Contrast:"), 1, 2)
         control_layout.addWidget(self.contrast_slider, 1, 3)
         
-        # Add control panel to main layout
         main_layout.addWidget(control_panel)
         
-        # Buttons layout
+        # --- Action Buttons ---
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(15)
         
-        # Start/Stop stream button
         self.stream_button = QPushButton("Start Stream")
-        self.stream_button.setMinimumWidth(120)
         self.stream_button.clicked.connect(self.toggle_stream)
         buttons_layout.addWidget(self.stream_button)
         
-        # Capture button
         self.capture_button = QPushButton("Capture Image")
-        self.capture_button.setMinimumWidth(120)
         self.capture_button.clicked.connect(self.capture_image)
         buttons_layout.addWidget(self.capture_button)
         
-        # Record button
         self.record_button = QPushButton("Start Recording")
-        self.record_button.setMinimumWidth(120)
         self.record_button.clicked.connect(self.toggle_recording)
         buttons_layout.addWidget(self.record_button)
         
-        # Add buttons layout to main layout
         main_layout.addLayout(buttons_layout)
         
-        # Create timer for camera updates
+        # Timer for camera updates
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_frame)
         
@@ -260,25 +174,19 @@ class CaptureTab(QWidget):
     def toggle_stream(self):
         """Toggle camera stream on/off"""
         if self.stream_active:
-            # Stop the stream
             self.stream_active = False
             self.timer.stop()
-            if self.camera:
-                self.camera.stop_stream()
             self.stream_button.setText("Start Stream")
+            self.stream_button.setStyleSheet("") # Reset style
+            self.camera_view.setText("Camera stream stopped.")
         else:
-            # Start the stream
-            if not self.camera:
-                self.init_camera()
-            
-            if self.camera:
-                try:
-                    self.camera.start_stream()
-                    self.stream_active = True
-                    self.timer.start(30)  # Update at approximately 33 fps
-                    self.stream_button.setText("Stop Stream")
-                except Exception as e:
-                    QMessageBox.warning(self, "Camera Error", f"Error starting camera stream: {e}")
+            if self.camera is not None and self.camera.start_stream():
+                self.stream_active = True
+                self.timer.start(30)  # Update every 30ms
+                self.stream_button.setText("Stop Stream")
+                self.stream_button.setStyleSheet("background-color: #e74c3c;") # Red color
+            else:
+                QMessageBox.warning(self, "Stream Error", "Could not start camera stream.")
     
     @pyqtSlot()
     def update_frame(self):
@@ -360,49 +268,31 @@ class CaptureTab(QWidget):
     
     @pyqtSlot()
     def toggle_recording(self):
-        """Start or stop video recording"""
-        if not self.camera:
-            QMessageBox.warning(self, "Camera Error", "Camera not available")
-            return
-            
+        """Toggle video recording on/off"""
         if self.recording:
-            # Stop recording
-            try:
-                self.camera.stop_recording()
-                self.recording = False
-                self.record_button.setText("Start Recording")
-                
-                # Show confirmation
-                QMessageBox.information(
-                    self, 
-                    "Recording Complete", 
-                    f"Video saved to:\n{self.recording_path}"
-                )
-            except Exception as e:
-                QMessageBox.warning(self, "Recording Error", f"Error stopping recording: {e}")
+            self.recording = False
+            self.camera.stop_recording()
+            self.record_button.setText("Start Recording")
+            self.record_button.setStyleSheet("") # Reset style
+            QMessageBox.information(self, "Recording Stopped", f"Video saved to: {self.recording_path}")
         else:
-            # Start recording
-            try:
-                # Create filename with timestamp
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"video_{timestamp}.{self.config['output']['video_format']}"
-                self.recording_path = os.path.join(
-                    os.environ.get('APP_BASE_DIR', ''), 
-                    'output', 
-                    'videos', 
-                    filename
-                )
-                
-                # Ensure stream is active
-                if not self.stream_active:
-                    self.toggle_stream()
-                
-                # Start recording
-                self.camera.start_recording(self.recording_path)
-                self.recording = True
+            if not self.stream_active:
+                QMessageBox.warning(self, "Recording Error", "Please start the camera stream first.")
+                return
+
+            save_dir = os.path.join(os.environ.get('APP_BASE_DIR', ''), 'output', 'videos')
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.recording_path = os.path.join(save_dir, f"rec_{timestamp}.mp4")
+            
+            self.recording = self.camera.start_recording(self.recording_path)
+            if self.recording:
                 self.record_button.setText("Stop Recording")
-            except Exception as e:
-                QMessageBox.warning(self, "Recording Error", f"Error starting recording: {e}")
+                self.record_button.setStyleSheet("background-color: #e74c3c;") # Red color
+            else:
+                QMessageBox.critical(self, "Recording Error", "Failed to start recording.")
     
     @pyqtSlot(int)
     def change_camera(self, index):
@@ -433,12 +323,13 @@ class CaptureTab(QWidget):
     @pyqtSlot(int)
     def change_resolution(self, index):
         """Change camera resolution"""
+        resolution_text = self.resolution_selector.itemText(index)
+        width, height = map(int, resolution_text.split('x'))
+        
         if self.camera:
-            resolution = self.resolution_selector.currentData()
-            try:
-                self.camera.set_resolution(resolution)
-            except Exception as e:
-                QMessageBox.warning(self, "Camera Error", f"Error changing resolution: {e}")
+            self.camera.set_resolution((width, height))
+        
+        update_config({"camera": {"resolution": [width, height]}})
     
     @pyqtSlot(int)
     def change_brightness(self, value):

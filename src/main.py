@@ -44,45 +44,33 @@ def setup_environment():
 
 
 def main():
-    """Main application entry point"""
-    # Set up environment
-    base_dir = setup_environment()
+    """Main function to run the application"""
+    # Set base directory for the application
+    if getattr(sys, 'frozen', False):
+        # The application is frozen
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # The application is not frozen
+        base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Parse command line arguments
-    args = sys.argv[1:]
-    
-    # Check for help flag
-    if '--help' in args or '-h' in args:
-        print("Brightness Detector Usage:")
-        print("  --sim, -s         : Enable simulation mode (use virtual camera)")
-        print("  --help, -h        : Show this help message")
-        return
-    
-    # Load configuration
+    os.environ['APP_BASE_DIR'] = base_dir
+
+    # Check for simulation mode argument
+    if '--sim' in sys.argv or '-s' in sys.argv:
+        os.environ['SIMULATION_MODE'] = 'True'
+
+    # Load configuration from file
     config = load_config()
-    
-    # Initialize application
+
+    # Create and run the application
     app = QApplication(sys.argv)
-    app.setApplicationName("Brightness Detector")
     
-    # Set application style
-    app.setStyle('Fusion')
+    main_win = MainWindow(config)
+    main_win.show()
+
+    if os.environ.get('SIMULATION_MODE') == 'True':
+        QMessageBox.information(main_win, "Simulation Mode", "Running in simulation mode.")
     
-    # Create main window
-    window = MainWindow(config)
-    window.setWindowTitle("Brightness Detector for Raspberry Pi")
-    window.resize(1024, 768)
-    
-    # Show simulation mode notification if enabled
-    if os.environ.get('SIMULATION_MODE', 'False').lower() == 'true':
-        QMessageBox.information(window, "Simulation Mode", 
-                              "Running in simulation mode with virtual camera.\n"
-                              "This mode allows testing without physical camera hardware.")
-    
-    # Show the window
-    window.show()
-    
-    # Start application event loop
     sys.exit(app.exec_())
 
 

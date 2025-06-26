@@ -7,7 +7,7 @@ import sys
 from PyQt5.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QFileDialog, QMessageBox, QSplitter,
-    QAction, QToolBar, QStatusBar, QComboBox, QApplication
+    QAction, QToolBar, QStatusBar, QComboBox, QApplication, QStyle
 )
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QTimer
 from PyQt5.QtGui import QIcon, QPixmap
@@ -16,7 +16,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 from ui.capture_tab import CaptureTab
 from ui.analysis_tab import AnalysisTab
 from ui.results_tab import ResultsTab
-from ui.styles import MAIN_STYLE
+from ui.dark_theme import DARK_THEME_STYLE
 from utils.config import update_config
 
 
@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1200, 800)
         
         # Apply stylesheet
-        self.setStyleSheet(MAIN_STYLE)
+        self.setStyleSheet(DARK_THEME_STYLE)
         
         # Create central widget and layout
         central_widget = QWidget()
@@ -144,15 +144,18 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
         
+        # Get standard icons
+        style = self.style()
+        
         # Add toolbar buttons
         # Open button
-        open_action = QAction("Open", self)
+        open_action = QAction(style.standardIcon(QStyle.SP_DialogOpenButton), "Open", self)
         open_action.setStatusTip("Open an image or video file")
         open_action.triggered.connect(self.open_file)
         toolbar.addAction(open_action)
         
         # Camera capture button
-        capture_action = QAction("Capture", self)
+        capture_action = QAction(style.standardIcon(QStyle.SP_MediaPlay), "Capture", self)
         capture_action.setStatusTip("Capture an image from camera")
         capture_action.triggered.connect(self.capture_tab.capture_image)
         toolbar.addAction(capture_action)
@@ -160,7 +163,7 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
         
         # Analyze button
-        analyze_action = QAction("Analyze", self)
+        analyze_action = QAction(style.standardIcon(QStyle.SP_ArrowForward), "Analyze", self)
         analyze_action.setStatusTip("Analyze current media")
         analyze_action.triggered.connect(self.analyze_current)
         toolbar.addAction(analyze_action)
@@ -168,7 +171,7 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
         
         # Save button
-        save_action = QAction("Save", self)
+        save_action = QAction(style.standardIcon(QStyle.SP_DialogSaveButton), "Save", self)
         save_action.setStatusTip("Save analysis results")
         save_action.triggered.connect(self.save_results)
         toolbar.addAction(save_action)
