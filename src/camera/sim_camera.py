@@ -32,11 +32,26 @@ class SimCamera:
     def start_recording(self, path):
         self.is_recording = True
         self.recording_path = path
-        # In a real scenario, you'd handle video writing here.
+        # Create a video writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.video_writer = cv2.VideoWriter(
+            path, fourcc, 30, (self.width, self.height)
+        )
         return True
+
+    def write_video_frame(self, frame):
+        if self.is_recording and hasattr(self, 'video_writer') and self.video_writer is not None:
+            if len(frame.shape) == 3 and frame.shape[2] == 3:
+                bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            else:
+                bgr_frame = frame
+            self.video_writer.write(bgr_frame)
 
     def stop_recording(self):
         self.is_recording = False
+        if hasattr(self, 'video_writer') and self.video_writer is not None:
+            self.video_writer.release()
+            self.video_writer = None
 
     def list_cameras(self):
         return ["Simulated Camera"]

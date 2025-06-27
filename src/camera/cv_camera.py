@@ -372,3 +372,13 @@ class CVCamera:
         if self.camera is not None:
             self.camera.release()
             self.camera = None
+    
+    def write_video_frame(self, frame):
+        """Write a frame to the video file if recording is active."""
+        if self.recording and self.video_writer is not None:
+            # Convert RGB to BGR for OpenCV
+            if len(frame.shape) == 3 and frame.shape[2] == 3:
+                bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            else:
+                bgr_frame = frame
+            self.video_writer.write(bgr_frame)

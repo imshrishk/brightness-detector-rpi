@@ -197,11 +197,13 @@ class CaptureTab(QWidget):
         try:
             frame = self.camera.get_frame()
             if frame is not None:
+                # Write video frame if recording
+                if self.recording:
+                    self.camera.write_video_frame(frame)
                 # Convert frame to QImage
                 height, width, channel = frame.shape
                 bytes_per_line = channel * width
                 q_image = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
-                
                 # Display the QImage in the QLabel
                 self.camera_view.setPixmap(QPixmap.fromImage(q_image).scaled(
                     self.camera_view.width(), 
