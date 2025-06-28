@@ -141,8 +141,8 @@ class CVCamera:
         """Start camera stream"""
         if self.simulation_mode:
             self.stream_active = True
-            return
-            
+            return True
+        
         if self.camera is None:
             # Try to initialize the default camera
             try:
@@ -151,15 +151,16 @@ class CVCamera:
                 print(f"Error selecting camera: {e}")
                 self.simulation_mode = True
                 self.stream_active = True
-                return
+                return True
         
         if not self.camera.isOpened():
             print("Camera could not be opened, falling back to simulation mode")
             self.simulation_mode = True
             self.stream_active = True
-            return
+            return True
         
         self.stream_active = True
+        return True
     
     def stop_stream(self):
         """Stop camera stream"""
