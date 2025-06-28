@@ -15,7 +15,9 @@ class SimCamera:
         self.frame = self._create_dummy_frame("Camera is OFF")
 
     def start_stream(self):
+        print("[DEBUG] sim_camera.py: start_stream called.")
         self.is_streaming = True
+        print("[DEBUG] sim_camera.py: start_stream returning True")
         return True
 
     def stop_stream(self):

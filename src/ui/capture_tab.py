@@ -270,7 +270,7 @@ class CaptureTab(QWidget):
     
     @pyqtSlot()
     def toggle_recording(self):
-        """Toggle video recording on/off"""
+        print(f"[DEBUG] toggle_recording called. recording={self.recording}, stream_active={self.stream_active}")
         if self.recording:
             self.recording = False
             self.camera.stop_recording()
@@ -280,13 +280,16 @@ class CaptureTab(QWidget):
         else:
             # Automatically start stream if not active
             if not self.stream_active:
+                print("[DEBUG] Stream not active, attempting to start stream...")
                 started = self.camera.start_stream() if self.camera else False
+                print(f"[DEBUG] start_stream returned: {started}")
                 if started:
                     self.stream_active = True
                     self.timer.start(30)
                     self.stream_button.setText("Stop Stream")
                     self.stream_button.setStyleSheet("background-color: #e74c3c;")
                 else:
+                    print("[DEBUG] Could not start camera stream!")
                     QMessageBox.warning(self, "Recording Error", "Could not start camera stream.")
                     return
 
