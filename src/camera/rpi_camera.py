@@ -114,16 +114,20 @@ class RPiCamera:
             self._init_camera()
         
         if not self.camera:
-            raise Exception("Camera is not available")
+            print("[DEBUG] rpi_camera.py: start_stream failed, camera is not available")
+            return False
         
         try:
             # Start the camera
             self.camera.start()
             self.stream_active = True
+            print("[DEBUG] rpi_camera.py: start_stream succeeded")
+            return True
         except Exception as e:
             print(f"Error starting stream: {e}")
             self.stream_active = False
-            raise
+            print("[DEBUG] rpi_camera.py: start_stream failed with exception")
+            return False
     
     def stop_stream(self):
         """Stop camera stream"""
