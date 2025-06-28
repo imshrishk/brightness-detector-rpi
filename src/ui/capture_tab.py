@@ -278,9 +278,17 @@ class CaptureTab(QWidget):
             self.record_button.setStyleSheet("") # Reset style
             QMessageBox.information(self, "Recording Stopped", f"Video saved to: {self.recording_path}")
         else:
+            # Automatically start stream if not active
             if not self.stream_active:
-                QMessageBox.warning(self, "Recording Error", "Please start the camera stream first.")
-                return
+                started = self.camera.start_stream() if self.camera else False
+                if started:
+                    self.stream_active = True
+                    self.timer.start(30)
+                    self.stream_button.setText("Stop Stream")
+                    self.stream_button.setStyleSheet("background-color: #e74c3c;")
+                else:
+                    QMessageBox.warning(self, "Recording Error", "Could not start camera stream.")
+                    return
 
             save_dir = os.path.join(os.environ.get('APP_BASE_DIR', ''), 'output', 'videos')
             if not os.path.exists(save_dir):
