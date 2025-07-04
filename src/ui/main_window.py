@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """Initialize the user interface"""
         # Set window properties
-        self.setWindowTitle("Brightness Detector")
+        self.setWindowTitle("PoST Chemilumonometer")
         self.setMinimumSize(1200, 800)
         
         # Apply stylesheet
@@ -43,6 +43,40 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
+        
+        # --- Top Bar with Logos and Title ---
+        top_bar_widget = QWidget()
+        top_bar_widget.setStyleSheet("background: transparent;")
+        top_bar = QHBoxLayout(top_bar_widget)
+        top_bar.setContentsMargins(8, 0, 8, 0)
+        top_bar.setSpacing(16)
+
+        # Left logo
+        left_logo = QLabel()
+        left_logo.setMaximumSize(140, 140)
+        left_logo.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        left_pixmap = QPixmap("sample3.png")
+        if not left_pixmap.isNull():
+            left_logo.setPixmap(left_pixmap.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        top_bar.addWidget(left_logo, alignment=Qt.AlignVCenter | Qt.AlignLeft)
+
+        # Center title
+        title = QLabel("PoST Chemilumonometer")
+        title.setStyleSheet("font-size: 36px; font-weight: bold; color: #ecf0f1;")
+        title.setAlignment(Qt.AlignCenter)
+        top_bar.addWidget(title, stretch=1, alignment=Qt.AlignVCenter)
+
+        # Right logo
+        right_logo = QLabel()
+        right_logo.setMaximumSize(140, 140)
+        right_logo.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        right_pixmap = QPixmap("sample2.png")
+        if not right_pixmap.isNull():
+            right_logo.setPixmap(right_pixmap.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        top_bar.addWidget(right_logo, alignment=Qt.AlignVCenter | Qt.AlignRight)
+
+        main_layout.addWidget(top_bar_widget)
+        # --- End Top Bar ---
         
         # Create tab widget for different functions
         self.tabs = QTabWidget()
