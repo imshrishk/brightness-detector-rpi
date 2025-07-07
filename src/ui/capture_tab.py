@@ -38,6 +38,13 @@ try:
         print("INFO: Raspberry Pi detected. Using picamera2 backend.")
         # Import Raspberry Pi specific camera module
         from camera.rpi_camera import RPiCamera as Camera
+        # Check for picamera2 availability
+        try:
+            from picamera2 import Picamera2
+        except ImportError:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(None, "Missing Dependency", "picamera2 is not installed. Please install it to use the camera on Raspberry Pi.")
+            raise
     else:
         print("INFO: Not a Raspberry Pi. Using OpenCV backend.")
         # Use OpenCV for other platforms
@@ -59,6 +66,7 @@ class CaptureTab(QWidget):
         self.stream_active = False
         self.recording = False
         self.recording_path = None
+        self.base_dir = os.environ.get('APP_BASE_DIR', os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
         self.init_ui()
         self.init_camera()
         
@@ -198,7 +206,7 @@ class CaptureTab(QWidget):
             frame = self.camera.get_frame()
             if frame is not None:
                 # Write video frame if recording
-                if self.recording:
+                if self.recording and hasattr(self.camera, 'write_video_frame'):
                     self.camera.write_video_frame(frame)
                 # Convert frame to QImage
                 height, width, channel = frame.shape
@@ -240,12 +248,8 @@ class CaptureTab(QWidget):
                 # Save the image
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"image_{timestamp}.{self.config['output']['image_format']}"
-                file_path = os.path.join(
-                    os.environ.get('APP_BASE_DIR', ''), 
-                    'output', 
-                    'images', 
-                    filename
-                )
+                
+                file_path = os.path.join(self.base_dir, 'output', 'images', filename)
                 
                 self.camera.save_image(image, file_path)
                 
@@ -293,7 +297,7 @@ class CaptureTab(QWidget):
                     QMessageBox.warning(self, "Recording Error", "Could not start camera stream.")
                     return
 
-            save_dir = os.path.join(os.environ.get('APP_BASE_DIR', ''), 'output', 'videos')
+            save_dir = os.path.join(self.base_dir, 'output', 'videos')
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             
