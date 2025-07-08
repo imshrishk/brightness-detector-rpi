@@ -55,7 +55,8 @@ class MainWindow(QMainWindow):
         left_logo = QLabel()
         left_logo.setMaximumSize(140, 140)
         left_logo.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        left_pixmap = QPixmap("sample3.png")
+        left_logo_path = os.path.join(os.path.dirname(__file__), '..', 'sample3.png')
+        left_pixmap = QPixmap(left_logo_path)
         if not left_pixmap.isNull():
             left_logo.setPixmap(left_pixmap.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         top_bar.addWidget(left_logo, alignment=Qt.AlignVCenter | Qt.AlignLeft)
@@ -70,7 +71,8 @@ class MainWindow(QMainWindow):
         right_logo = QLabel()
         right_logo.setMaximumSize(140, 140)
         right_logo.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        right_pixmap = QPixmap("sample2.png")
+        right_logo_path = os.path.join(os.path.dirname(__file__), '..', 'sample2.png')
+        right_pixmap = QPixmap(right_logo_path)
         if not right_pixmap.isNull():
             right_logo.setPixmap(right_pixmap.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         top_bar.addWidget(right_logo, alignment=Qt.AlignVCenter | Qt.AlignRight)

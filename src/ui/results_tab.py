@@ -18,7 +18,15 @@ import cv2
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import pandas as pd
+
+# Replace pandas with openpyxl for Excel export
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+    print("Warning: openpyxl not available. Excel export will be disabled.")
 
 
 class PhotoViewer(QGraphicsView):
@@ -440,42 +448,68 @@ class ResultsTab(QWidget):
         if not self.analysis_data:
             return
             
+        if not OPENPYXL_AVAILABLE:
+            QMessageBox.warning(
+                self,
+                "Export Error",
+                "Excel export requires openpyxl package. Please install it with: pip install openpyxl"
+            )
+            return
+            
         try:
-            # Create a DataFrame with the analysis data
-            data = {
-                'Metric': [
-                    'Maximum Brightness',
-                    'Average Brightness',
-                    'Brightest Point X',
-                    'Brightest Point Y',
-                    'Frame Number',
-                    'Analysis Time'
-                ],
-                'Value': [
-                    self.analysis_data.get('max_brightness', 0),
-                    self.analysis_data.get('average_brightness', 0),
-                    self.analysis_data.get('brightest_point', (0, 0))[0],
-                    self.analysis_data.get('brightest_point', (0, 0))[1],
-                    self.analysis_data.get('frame_number', 0),
-                    self.analysis_data.get('metadata', {}).get('analysis_time', '')
-                ]
-            }
+            # Create a new workbook
+            wb = Workbook()
+            
+            # Get the active sheet and rename it
+            ws = wb.active
+            ws.title = "Brightness Analysis"
+            
+            # Add headers
+            headers = ['Metric', 'Value']
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center')
+            
+            # Add analysis data
+            data = [
+                ('Maximum Brightness', self.analysis_data.get('max_brightness', 0)),
+                ('Average Brightness', self.analysis_data.get('average_brightness', 0)),
+                ('Brightest Point X', self.analysis_data.get('brightest_point', (0, 0))[0]),
+                ('Brightest Point Y', self.analysis_data.get('brightest_point', (0, 0))[1]),
+                ('Frame Number', self.analysis_data.get('frame_number', 0)),
+                ('Analysis Time', self.analysis_data.get('metadata', {}).get('analysis_time', ''))
+            ]
             
             # Add video-specific data if available
             if self.analysis_data.get('is_video', False):
-                data['Metric'].extend([
-                    'Total Frames',
-                    'FPS',
-                    'Frame Time (seconds)'
-                ])
-                data['Value'].extend([
-                    self.analysis_data.get('total_frames', 0),
-                    self.analysis_data.get('fps', 0),
-                    self.analysis_data.get('frame_number', 0) / self.analysis_data.get('fps', 1)
+                data.extend([
+                    ('Total Frames', self.analysis_data.get('total_frames', 0)),
+                    ('FPS', self.analysis_data.get('fps', 0)),
+                    ('Frame Time (seconds)', self.analysis_data.get('frame_number', 0) / self.analysis_data.get('fps', 1))
                 ])
             
-            # Create DataFrame
-            df = pd.DataFrame(data)
+            # Write data to worksheet
+            for row, (metric, value) in enumerate(data, 2):
+                ws.cell(row=row, column=1, value=metric)
+                ws.cell(row=row, column=2, value=value)
+            
+            # Add histogram data to a new sheet if available
+            if 'histogram' in self.analysis_data and self.analysis_data['histogram'] is not None:
+                hist_ws = wb.create_sheet("Histogram")
+                
+                # Add headers
+                hist_headers = ['Brightness Level', 'Pixel Count']
+                for col, header in enumerate(hist_headers, 1):
+                    cell = hist_ws.cell(row=1, column=col, value=header)
+                    cell.font = Font(bold=True)
+                    cell.alignment = Alignment(horizontal='center')
+                
+                # Add histogram data
+                histogram = self.analysis_data['histogram']
+                for i, count in enumerate(histogram):
+                    hist_ws.cell(row=i+2, column=1, value=i)
+                    hist_ws.cell(row=i+2, column=2, value=int(count))
             
             # Get save file path
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -488,18 +522,8 @@ class ResultsTab(QWidget):
             )
             
             if file_path:
-                # Save to Excel
-                df.to_excel(file_path, index=False, sheet_name='Brightness Analysis')
-                
-                # Add histogram data to a new sheet
-                if 'histogram' in self.analysis_data and self.analysis_data['histogram'] is not None:
-                    hist_df = pd.DataFrame({
-                        'Brightness Level': range(256),
-                        'Pixel Count': self.analysis_data['histogram']
-                    })
-                    
-                    with pd.ExcelWriter(file_path, engine='openpyxl', mode='a') as writer:
-                        hist_df.to_excel(writer, index=False, sheet_name='Histogram')
+                # Save the workbook
+                wb.save(file_path)
                 
                 QMessageBox.information(
                     self,
