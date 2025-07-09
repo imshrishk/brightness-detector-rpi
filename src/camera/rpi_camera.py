@@ -30,6 +30,9 @@ class RPiCamera:
         self.resolution = config.get("resolution", (1280, 720))
         self.stream_active = False
         self.recording = False
+        self.video_writer = None  # For OpenCV-based recording fallback
+        self.recording_path = None
+        self.using_picamera_recording = False  # Flag to track recording mode
         
         # Try to initialize the camera
         self._init_camera()
@@ -37,13 +40,15 @@ class RPiCamera:
     def _init_camera(self):
         """Initialize the picamera2 instance"""
         if not PICAMERA_AVAILABLE:
-            raise ImportError("picamera2 is not available")
+            print("Warning: picamera2 not available, RPi camera will use fallback mode")
+            self.camera = None
+            return
         
         try:
             self.camera = Picamera2()
             
-            # Configure the camera
-            config = self.camera.create_still_configuration(
+            # Configure the camera for video recording
+            config = self.camera.create_video_configuration(
                 main={"size": self.resolution},
                 lores={"size": (640, 480)},
                 display="lores"
@@ -62,7 +67,6 @@ class RPiCamera:
         except Exception as e:
             print(f"Error initializing RPi camera: {e}")
             self.camera = None
-            raise
     
     def list_cameras(self):
         """List available camera devices"""
@@ -91,8 +95,8 @@ class RPiCamera:
             # Initialize new camera with index
             self.camera = Picamera2(camera_index)
             
-            # Configure the camera
-            config = self.camera.create_still_configuration(
+            # Configure the camera for video recording
+            config = self.camera.create_video_configuration(
                 main={"size": self.resolution},
                 lores={"size": (640, 480)},
                 display="lores"
@@ -190,12 +194,16 @@ class RPiCamera:
         # Ensure directory exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
+        self.recording_path = file_path
+        
         try:
+            # Try using picamera2's built-in recording first
             # Create encoder based on file extension
             _, ext = os.path.splitext(file_path)
             
             if ext.lower() == '.mp4' or ext.lower() == '.h264':
-                encoder = H264Encoder(10000000)  # 10Mbps bitrate
+                # Use lower bitrate for RPi to avoid performance issues
+                encoder = H264Encoder(5000000)  # 5Mbps bitrate (reduced from 10Mbps)
             else:
                 # Default to MJPEG for other formats like .avi
                 encoder = MJPEGEncoder()
@@ -203,29 +211,113 @@ class RPiCamera:
             # Use FfmpegOutput for robust container handling
             output = FfmpegOutput(file_path)
             
+            # Ensure camera is started before recording
+            if not self.stream_active:
+                self.camera.start()
+                self.stream_active = True
+            
             # start_recording is a robust, high-level call
             self.camera.start_recording(encoder, output)
             
             self.recording = True
+            self.using_picamera_recording = True  # Flag to indicate picamera2 recording mode
+            print(f"[DEBUG] RPi camera recording started (picamera2 mode): {file_path}")
             return True
         except Exception as e:
-            print(f"Error starting recording: {e}")
+            print(f"Error starting picamera2 recording: {e}")
+            print("Falling back to OpenCV-based recording...")
+            
+            # Fallback to OpenCV-based recording
+            return self._start_opencv_recording(file_path)
+    
+    def _start_opencv_recording(self, file_path):
+        """Start recording using OpenCV as fallback"""
+        try:
+            # Get video properties
+            width, height = self.resolution
+            fps = 30
+            
+            # Get video format from file extension
+            _, ext = os.path.splitext(file_path)
+            
+            # Choose codec based on extension
+            if ext.lower() == '.mp4':
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            elif ext.lower() == '.avi':
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            else:
+                # Default to MP4
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            
+            # Create video writer
+            self.video_writer = cv2.VideoWriter(
+                file_path,
+                fourcc,
+                fps,
+                (width, height)
+            )
+            
+            self.recording = True
+            self.using_picamera_recording = False  # Flag to indicate OpenCV recording mode
+            print(f"[DEBUG] OpenCV recording started: {file_path}")
+            return True
+        except Exception as e:
+            print(f"Error starting OpenCV recording: {e}")
             self.recording = False
             return False
     
     def stop_recording(self):
         """Stop video recording"""
-        if not self.camera or not self.recording:
+        if not self.recording:
             return False
         
         try:
-            # High-level call to stop recording
-            self.camera.stop_recording()
+            # Stop picamera2 recording if active
+            if hasattr(self, 'using_picamera_recording') and self.using_picamera_recording:
+                if self.camera and hasattr(self.camera, 'stop_recording'):
+                    try:
+                        self.camera.stop_recording()
+                        print("[DEBUG] picamera2 recording stopped")
+                    except Exception as e:
+                        print(f"Error stopping picamera2 recording: {e}")
+            else:
+                # Stop OpenCV recording if active
+                if self.video_writer is not None:
+                    self.video_writer.release()
+                    self.video_writer = None
+                    print("[DEBUG] OpenCV recording stopped")
+            
             self.recording = False
+            self.using_picamera_recording = False
+            print(f"[DEBUG] Recording stopped: {self.recording_path}")
             return True
         except Exception as e:
             print(f"Error stopping recording: {e}")
             return False
+    
+    def write_video_frame(self, frame):
+        """Write a frame to the video file if recording is active."""
+        if not self.recording:
+            return
+        
+        try:
+            # Only write frames manually if using OpenCV recording (fallback mode)
+            # For picamera2 recording, frames are automatically written by the camera
+            if hasattr(self, 'using_picamera_recording') and not self.using_picamera_recording:
+                if self.video_writer is not None:
+                    # Convert RGB to BGR for OpenCV
+                    if len(frame.shape) == 3 and frame.shape[2] == 3:
+                        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    else:
+                        bgr_frame = frame
+                    self.video_writer.write(bgr_frame)
+            else:
+                # For picamera2 recording, frames are handled automatically
+                # No manual frame writing needed
+                pass
+            
+        except Exception as e:
+            print(f"Error writing video frame: {e}")
     
     def set_resolution(self, resolution):
         """Set camera resolution"""
@@ -248,7 +340,7 @@ class RPiCamera:
             self.resolution = resolution
             
             # Reconfigure
-            config = self.camera.create_still_configuration(
+            config = self.camera.create_video_configuration(
                 main={"size": self.resolution},
                 lores={"size": (640, 480)},
                 display="lores"
@@ -303,6 +395,14 @@ class RPiCamera:
         
         if self.stream_active:
             self.stop_stream()
+        
+        # Release video writer if it exists
+        if self.video_writer is not None:
+            try:
+                self.video_writer.release()
+            except:
+                pass
+            self.video_writer = None
         
         if self.camera is not None:
             try:

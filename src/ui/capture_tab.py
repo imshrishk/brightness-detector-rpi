@@ -207,7 +207,11 @@ class CaptureTab(QWidget):
             if frame is not None:
                 # Write video frame if recording
                 if self.recording and hasattr(self.camera, 'write_video_frame'):
-                    self.camera.write_video_frame(frame)
+                    try:
+                        self.camera.write_video_frame(frame)
+                    except Exception as e:
+                        print(f"Error writing video frame: {e}")
+                
                 # Convert frame to QImage
                 height, width, channel = frame.shape
                 bytes_per_line = channel * width
@@ -276,8 +280,10 @@ class CaptureTab(QWidget):
     def toggle_recording(self):
         print(f"[DEBUG] toggle_recording called. recording={self.recording}, stream_active={self.stream_active}")
         if self.recording:
+            print("[DEBUG] Stopping recording...")
             self.recording = False
-            self.camera.stop_recording()
+            success = self.camera.stop_recording()
+            print(f"[DEBUG] stop_recording returned: {success}")
             self.record_button.setText("Start Recording")
             self.record_button.setStyleSheet("") # Reset style
             QMessageBox.information(self, "Recording Stopped", f"Video saved to: {self.recording_path}")
@@ -304,12 +310,17 @@ class CaptureTab(QWidget):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.recording_path = os.path.join(save_dir, f"rec_{timestamp}.mp4")
             
+            print(f"[DEBUG] Starting recording to: {self.recording_path}")
             self.recording = self.camera.start_recording(self.recording_path)
+            print(f"[DEBUG] start_recording returned: {self.recording}")
+            
             if self.recording:
                 self.record_button.setText("Stop Recording")
                 self.record_button.setStyleSheet("background-color: #e74c3c;") # Red color
+                print("[DEBUG] Recording started successfully")
             else:
                 QMessageBox.critical(self, "Recording Error", "Failed to start recording.")
+                print("[DEBUG] Recording failed to start")
     
     @pyqtSlot(int)
     def change_camera(self, index):

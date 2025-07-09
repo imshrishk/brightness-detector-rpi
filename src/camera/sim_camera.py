@@ -23,6 +23,11 @@ class SimCamera:
     def stop_stream(self):
         self.is_streaming = False
 
+    def get_frame(self):
+        if not self.is_streaming:
+            return self.frame
+        return self._create_dummy_frame(f"{datetime.now():%H:%M:%S}")
+    
     def capture_frame(self):
         if not self.is_streaming:
             return self.frame
@@ -30,6 +35,23 @@ class SimCamera:
 
     def capture_image(self):
         return self._create_dummy_frame("Captured Image")
+
+    def save_image(self, image, file_path):
+        """Save image to file"""
+        import os
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # Convert RGB to BGR for OpenCV
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            bgr_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        else:
+            bgr_image = image
+        
+        # Save the image
+        cv2.imwrite(file_path, bgr_image)
+        
+        return file_path
 
     def start_recording(self, path):
         self.is_recording = True
@@ -52,11 +74,27 @@ class SimCamera:
     def stop_recording(self):
         self.is_recording = False
         if hasattr(self, 'video_writer') and self.video_writer is not None:
-            self.video_writer.release()
-            self.video_writer = None
+            try:
+                # Write some frames to ensure a valid video file
+                for _ in range(30):  # Add 1 second of footage
+                    frame = self._create_dummy_frame(f"Recording {datetime.now():%H:%M:%S}")
+                    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    self.video_writer.write(bgr_frame)
+                
+                self.video_writer.release()
+                self.video_writer = None
+                return True
+            except Exception as e:
+                print(f"Error in stop_recording: {e}")
+                return False
+        return True
 
     def list_cameras(self):
         return ["Simulated Camera"]
+
+    def select_camera(self, camera_index):
+        """Select camera by index (not applicable for simulation)"""
+        return True
 
     def set_resolution(self, resolution):
         self.width, self.height = resolution
