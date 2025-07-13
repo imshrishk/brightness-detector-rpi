@@ -204,7 +204,7 @@ class ResultsTab(QWidget):
             q_image = QImage(image.data, width, height, bytes_per_line, QImage.Format_RGB888)
         else:
             # Try to handle grayscale image
-            height, width = image.shape
+            height, width = image.shape[:2]
             q_image = QImage(image.data, width, height, width, QImage.Format_Grayscale8)
         
         # Display the QImage in the QLabel
