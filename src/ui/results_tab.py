@@ -464,14 +464,7 @@ class ResultsTab(QWidget):
             ws = wb.active
             ws.title = "Brightness Analysis"
             
-            # Add headers
-            headers = ['Metric', 'Value']
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=1, column=col, value=header)
-                cell.font = Font(bold=True)
-                cell.alignment = Alignment(horizontal='center')
-            
-            # Add analysis data
+            # Prepare analysis data
             data = [
                 ('Maximum Brightness', self.analysis_data.get('max_brightness', 0)),
                 ('Average Brightness', self.analysis_data.get('average_brightness', 0)),
@@ -489,10 +482,14 @@ class ResultsTab(QWidget):
                     ('Frame Time (seconds)', self.analysis_data.get('frame_number', 0) / self.analysis_data.get('fps', 1))
                 ])
             
-            # Write data to worksheet
-            for row, (metric, value) in enumerate(data, 2):
-                ws.cell(row=row, column=1, value=metric)
-                ws.cell(row=row, column=2, value=value)
+            # Write headers horizontally
+            for col, (metric, _) in enumerate(data, 1):
+                cell = ws.cell(row=1, column=col, value=metric)
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center')
+            # Write values horizontally
+            for col, (_, value) in enumerate(data, 1):
+                ws.cell(row=2, column=col, value=value)
             
             # Add histogram data to a new sheet if available
             if 'histogram' in self.analysis_data and self.analysis_data['histogram'] is not None:
