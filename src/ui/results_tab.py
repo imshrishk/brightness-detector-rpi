@@ -181,6 +181,11 @@ class ResultsTab(QWidget):
         self.export_button.setEnabled(False)
         buttons_layout.addWidget(self.export_button)
         
+        self.analyze_adjusted_button = QPushButton("Analyze Adjusted Image")
+        self.analyze_adjusted_button.clicked.connect(self.analyze_adjusted_image)
+        self.analyze_adjusted_button.setEnabled(False)
+        buttons_layout.addWidget(self.analyze_adjusted_button)
+        
         self.clear_button = QPushButton("Clear Results")
         self.clear_button.clicked.connect(self.clear)
         buttons_layout.addWidget(self.clear_button)
@@ -212,6 +217,7 @@ class ResultsTab(QWidget):
         
         # Enable save buttons
         self.save_image_button.setEnabled(True)
+        self.analyze_adjusted_button.setEnabled(True)
     
     @pyqtSlot(dict)
     def display_analysis(self, analysis_data):
@@ -241,6 +247,7 @@ class ResultsTab(QWidget):
         # Enable save buttons
         self.save_image_button.setEnabled(True)
         self.save_data_button.setEnabled(True)
+        self.analyze_adjusted_button.setEnabled(True)
 
         # Reset and enable sliders
         self.brightness_slider.setEnabled(True)
@@ -270,6 +277,16 @@ class ResultsTab(QWidget):
         
         if 'frame_number' in analysis_data:
             details += f"<br><b>Frame Number:</b> {analysis_data.get('frame_number', 'N/A')}"
+        
+        # Add adjustment information if available
+        if 'adjustment_metadata' in analysis_data:
+            adj_meta = analysis_data['adjustment_metadata']
+            if adj_meta.get('was_adjusted', False):
+                details += f"""
+                <br><br><b>Image Adjustments:</b>
+                <br><b>Brightness:</b> {adj_meta.get('brightness_adjustment', 0)}
+                <br><b>Contrast:</b> {adj_meta.get('contrast_adjustment', 0)}
+                """
             
         self.details_text.setHtml(details)
     
@@ -316,6 +333,9 @@ class ResultsTab(QWidget):
         
         # Update the preview with the adjusted image
         self.update_image_preview(self.adjusted_image)
+        
+        # Enable analyze button when adjustments are made
+        self.analyze_adjusted_button.setEnabled(True)
 
     def update_image_preview(self, image_to_display):
         """Helper to update the image preview label."""
@@ -422,6 +442,52 @@ class ResultsTab(QWidget):
         self.save_data()
     
     @pyqtSlot()
+    def analyze_adjusted_image(self):
+        """Analyze the adjusted image (with brightness/contrast changes)"""
+        # Get the image to analyze (adjusted if available, otherwise original)
+        image_to_analyze = self.adjusted_image if self.adjusted_image is not None else self.current_image
+        
+        if image_to_analyze is None:
+            QMessageBox.warning(self, "Analysis Error", "No image to analyze")
+            return
+        
+        try:
+            # Import the analyzer here to avoid circular imports
+            from analysis.brightness_analyzer import BrightnessAnalyzer
+            
+            # Create analyzer instance
+            analyzer = BrightnessAnalyzer(self.config)
+            
+            # Run analysis on the adjusted image
+            analysis_result = analyzer.analyze_image(image_to_analyze)
+            
+            # Add metadata about the adjustment
+            if self.adjusted_image is not None:
+                brightness_value = self.brightness_slider.value()
+                contrast_value = self.contrast_slider.value()
+                analysis_result['adjustment_metadata'] = {
+                    'brightness_adjustment': brightness_value,
+                    'contrast_adjustment': contrast_value,
+                    'was_adjusted': True
+                }
+            else:
+                analysis_result['adjustment_metadata'] = {
+                    'brightness_adjustment': 0,
+                    'contrast_adjustment': 0,
+                    'was_adjusted': False
+                }
+            
+            # Display the new analysis results
+            self.display_analysis(analysis_result)
+            
+            QMessageBox.information(self, "Analysis Complete", 
+                                  "Analysis of adjusted image completed successfully!")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Analysis Error", 
+                               f"Error analyzing adjusted image: {str(e)}")
+    
+    @pyqtSlot()
     def clear(self):
         """Clear the current results"""
         self.current_image = None
@@ -436,6 +502,7 @@ class ResultsTab(QWidget):
         self.save_image_button.setEnabled(False)
         self.save_data_button.setEnabled(False)
         self.export_button.setEnabled(False)
+        self.analyze_adjusted_button.setEnabled(False)
 
         # Disable and reset sliders
         self.brightness_slider.setEnabled(False)
