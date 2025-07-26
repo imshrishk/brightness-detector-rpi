@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLabel, QTableWidget, QTableWidgetItem, QGroupBox, 
     QTextEdit, QFileDialog, QMessageBox, QSplitter,
-    QFrame, QSlider, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
+    QFrame, QSlider, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
+    QInputDialog,
 )
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor
@@ -354,7 +355,7 @@ class ResultsTab(QWidget):
 
     @pyqtSlot()
     def save_image(self):
-        """Save the current image to a file"""
+        """Save the current image to a file, letting the user select the folder and filename"""
         image_to_save = self.adjusted_image if self.adjusted_image is not None else self.current_image
         if image_to_save is None:
             QMessageBox.warning(self, "Save Error", "No image to save")
@@ -364,31 +365,36 @@ class ResultsTab(QWidget):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         default_name = f"brightness_analysis_{timestamp}.{self.config['output']['image_format']}"
         
-        # Open file dialog
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Image",
-            os.path.join(os.environ.get('APP_BASE_DIR', ''), 'output', 'images', default_name),
-            f"Images (*.{self.config['output']['image_format']})"
-        )
+        # Ask user to select a folder
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder to Save Image")
+        if not folder:
+            return
         
-        if file_path:
-            try:
-                # Save the image
-                if len(image_to_save.shape) == 3:
-                    # RGB image
-                    cv2.imwrite(file_path, cv2.cvtColor(image_to_save, cv2.COLOR_RGB2BGR))
-                else:
-                    # Grayscale image
-                    cv2.imwrite(file_path, image_to_save)
-                
-                QMessageBox.information(self, "Save Complete", f"Image saved to:\n{file_path}")
-            except Exception as e:
-                QMessageBox.warning(self, "Save Error", f"Error saving image: {e}")
-    
+        # Ask user for filename
+        filename, ok = QInputDialog.getText(self, "Save Image As", "Enter filename:", text=default_name)
+        if not ok or not filename:
+            return
+        
+        # Ensure correct extension
+        if not filename.lower().endswith(f".{self.config['output']['image_format']}"):
+            filename += f".{self.config['output']['image_format']}"
+        file_path = os.path.join(folder, filename)
+        
+        try:
+            # Save the image
+            if len(image_to_save.shape) == 3:
+                # RGB image
+                cv2.imwrite(file_path, cv2.cvtColor(image_to_save, cv2.COLOR_RGB2BGR))
+            else:
+                # Grayscale image
+                cv2.imwrite(file_path, image_to_save)
+            QMessageBox.information(self, "Save Complete", f"Image saved to:\n{file_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "Save Error", f"Error saving image: {e}")
+
     @pyqtSlot()
     def save_data(self):
-        """Save the analysis data to a JSON file"""
+        """Save the analysis data to a JSON file, letting the user select the folder and filename"""
         if self.current_analysis is None:
             QMessageBox.warning(self, "Save Error", "No analysis data to save")
             return
@@ -397,43 +403,43 @@ class ResultsTab(QWidget):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         default_name = f"brightness_analysis_{timestamp}.json"
         
-        # Open file dialog
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Analysis Data",
-            os.path.join(os.environ.get('APP_BASE_DIR', ''), 'output', default_name),
-            "JSON Files (*.json)"
-        )
+        # Ask user to select a folder
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder to Save Analysis Data")
+        if not folder:
+            return
         
-        if file_path:
-            try:
-                # Create a copy of the data, removing non-serializable items
-                data_to_save = self.current_analysis.copy()
-                
-                # Remove numpy arrays and other non-serializable objects
-                keys_to_remove = []
-                for key, value in data_to_save.items():
-                    if isinstance(value, np.ndarray):
-                        keys_to_remove.append(key)
-                
-                for key in keys_to_remove:
-                    data_to_save.pop(key)
-                
-                # Convert tuple coordinates to lists for JSON serialization
-                if 'brightest_point' in data_to_save:
-                    data_to_save['brightest_point'] = list(data_to_save['brightest_point'])
-                
-                # Add timestamp and metadata
-                data_to_save['timestamp'] = timestamp
-                data_to_save['app_version'] = "1.0.0"
-                
-                # Save to JSON file
-                with open(file_path, 'w') as f:
-                    json.dump(data_to_save, f, indent=4)
-                
-                QMessageBox.information(self, "Save Complete", f"Analysis data saved to:\n{file_path}")
-            except Exception as e:
-                QMessageBox.warning(self, "Save Error", f"Error saving data: {e}")
+        # Ask user for filename
+        filename, ok = QInputDialog.getText(self, "Save Analysis Data As", "Enter filename:", text=default_name)
+        if not ok or not filename:
+            return
+        
+        # Ensure correct extension
+        if not filename.lower().endswith(".json"):
+            filename += ".json"
+        file_path = os.path.join(folder, filename)
+        
+        try:
+            # Create a copy of the data, removing non-serializable items
+            data_to_save = self.current_analysis.copy()
+            # Remove numpy arrays and other non-serializable objects
+            keys_to_remove = []
+            for key, value in data_to_save.items():
+                if isinstance(value, np.ndarray):
+                    keys_to_remove.append(key)
+            for key in keys_to_remove:
+                data_to_save.pop(key)
+            # Convert tuple coordinates to lists for JSON serialization
+            if 'brightest_point' in data_to_save:
+                data_to_save['brightest_point'] = list(data_to_save['brightest_point'])
+            # Add timestamp and metadata
+            data_to_save['timestamp'] = timestamp
+            data_to_save['app_version'] = "1.0.0"
+            # Save to JSON file
+            with open(file_path, 'w') as f:
+                json.dump(data_to_save, f, indent=4)
+            QMessageBox.information(self, "Save Complete", f"Analysis data saved to:\n{file_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "Save Error", f"Error saving data: {e}")
     
     @pyqtSlot()
     def save_results(self):
